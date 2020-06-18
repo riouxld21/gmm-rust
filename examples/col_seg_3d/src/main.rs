@@ -71,13 +71,13 @@ fn main() {
     let img = image::open(&filename).expect(&format!("Impossible to open {}", filename));
     let img = img.to_rgb();
     let (width, height) = img.dimensions();
-    // Vec::<Vector3<f64>>::new()
-    let mut img_vec = Vec::<Vector3<f64>>::new();
+    // Vec::<Vector3<f32>>::new()
+    let mut img_vec = Vec::<Vector3<f32>>::new();
     for pixel in img.pixels() {
-        let temp = Vector3::<f64>::new(
-            pixel[0] as f64 / 255.0,
-            pixel[1] as f64 / 255.0,
-            pixel[2] as f64 / 255.0,
+        let temp = Vector3::<f32>::new(
+            pixel[0] as f32 / 255.0,
+            pixel[1] as f32 / 255.0,
+            pixel[2] as f32 / 255.0,
         );
         img_vec.push(temp);
     }
@@ -85,17 +85,17 @@ fn main() {
 
     // // Hyperparameters
     let percent_samples = value_t_or_exit!(matches.value_of("percent_samples"), usize);
-    let nb_train_samples = ((width*height) as f64 * percent_samples as f64 / 100 as f64) as usize;
+    let nb_train_samples = ((width*height) as f32 * percent_samples as f32 / 100 as f32) as usize;
     let nb_components = value_t_or_exit!(matches.value_of("nb_components"), usize);
-    let reg_cov = value_t_or_exit!(matches.value_of("reg_cov"), f64);
+    let reg_cov = value_t_or_exit!(matches.value_of("reg_cov"), f32);
     let nb_iter = value_t_or_exit!(matches.value_of("nb_iter"), usize);
-    let epsilon = value_t_or_exit!(matches.value_of("epsilon"), f64);
+    let epsilon = value_t_or_exit!(matches.value_of("epsilon"), f32);
 
     
     let mut rng = rand::thread_rng();
     let vec = (0..width*height).collect::<Vec<u32>>();
     let idx_train = vec.choose_multiple(&mut rng, nb_train_samples).map(|a| *a as usize).collect::<Vec<usize>>();
-    let x_train = idx_train.iter().map(|i| img_vec[*i]).collect::<Vec<Vector3<f64>>>();
+    let x_train = idx_train.iter().map(|i| img_vec[*i]).collect::<Vec<Vector3<f32>>>();
 
     // println!("{:#?}",idx_train)
     let mut my_gmm = gmm::init_gmm3_d(nb_train_samples, 

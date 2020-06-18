@@ -64,9 +64,9 @@ fn main() {
 let nb_train_samples = value_t_or_exit!(matches.value_of("nb_train_samples"), usize);
 let nb_test_samples = value_t_or_exit!(matches.value_of("nb_test_samples"), usize);
 let nb_components = value_t_or_exit!(matches.value_of("nb_components"), usize);
-let reg_cov = value_t_or_exit!(matches.value_of("reg_cov"), f64);
+let reg_cov = value_t_or_exit!(matches.value_of("reg_cov"), f32);
 let nb_iter = value_t_or_exit!(matches.value_of("nb_iter"), usize);
-let epsilon = value_t_or_exit!(matches.value_of("epsilon"), f64);
+let epsilon = value_t_or_exit!(matches.value_of("epsilon"), f32);
 
 
     // specify mean and covariance of our multi-variate normal
@@ -77,9 +77,9 @@ let epsilon = value_t_or_exit!(matches.value_of("epsilon"), f64);
     let uniform = Uniform::new(0., 1.).unwrap();
 
 
-    let pi = vec![1 as f64, 2 as f64];
+    let pi = vec![1 as f32, 2 as f32];
     let total = pi.iter()
-        .sum::<f64>();
+        .sum::<f32>();
     let pi = pi
         .iter()
         .map(|p| p/total)
@@ -87,15 +87,15 @@ let epsilon = value_t_or_exit!(matches.value_of("epsilon"), f64);
 
 
     let means = vec![
-        Vector3::from_vec(vec![-1.0, 0.0, 0.0]), 
-        Vector3::from_vec(vec![1.0, 0.0, 0.0])];
+        Vector3::from_vec(vec![-1.0f32, 0.0f32, 0.0f32]), 
+        Vector3::from_vec(vec![1.0f32, 0.0f32, 0.0f32])];
     let covs = vec![
-        Matrix3::from_vec(vec![0.5, 0.0, 0.0,
-            0.0, 0.5, 0.0,
-            0.0, 0.0, 0.5]), 
-        Matrix3::from_vec(vec![0.5, 0.0, 0.0,
-            0.0, 0.5, 0.0,
-            0.0, 0.0, 0.5])];
+        Matrix3::from_vec(vec![0.5f32, 0.0f32, 0.0f32,
+            0.0f32, 0.5f32, 0.0f32,
+            0.0f32, 0.0f32, 0.5f32]), 
+        Matrix3::from_vec(vec![0.5f32, 0.0f32, 0.0f32,
+            0.0f32, 0.5f32, 0.0f32,
+            0.0f32, 0.0f32, 0.5f32])];
     let covs_chol = covs.iter()
         .map(|&cov| cov.clone().cholesky().unwrap().l())
         .collect::<Vec<_>>();
@@ -103,22 +103,24 @@ let epsilon = value_t_or_exit!(matches.value_of("epsilon"), f64);
     let u_train = uniform
         .sample_iter(&mut rng)
         .take(nb_train_samples)
+        .map(|u| u as f32)
         .collect::<Vec<_>>();
 
     let u_norm_train = (0..nb_train_samples)
         .map(|_| Vector3::from_vec(normal.sample_iter(&mut rng)
             .take(3)
+            .map(|u| u as f32)
             .collect::<Vec<_>>()))
         .collect::<Vec<_>>();
 
     let x_train = u_train.iter()
-        .map(|&u| u < pi[1])
+        .map(|&u| (u as f32) < pi[1])
         .zip(u_norm_train.iter())
         .map(|(boolean, &u_norm)| means[boolean as usize] + covs_chol[boolean as usize]*u_norm)
         .collect::<Vec<_>>();
 
     let z_train = u_train.iter()
-        .map(|u| *u <  pi[1])
+        .map(|&u| (u as f32) <  pi[1])
         .map(|boolean|  boolean as usize)
         .collect::<Vec<_>>();
 
@@ -138,33 +140,35 @@ let epsilon = value_t_or_exit!(matches.value_of("epsilon"), f64);
         .iter()
         .zip(z_train.iter())
         .map(|(z_gmm, z_true)| (z_gmm == z_true) as usize )
-        .sum::<usize>() as f64 / nb_train_samples as f64;
+        .sum::<usize>() as f32 / nb_train_samples as f32;
     if train_accuracy < 0.25 {
-        train_accuracy = 1 as f64 - train_accuracy // index of gaussian shifted
+        train_accuracy = 1 as f32 - train_accuracy // index of gaussian shifted
     }
     println!("Training accuracy: {}", train_accuracy);
 
     let u_test = uniform
         .sample_iter(&mut rng)
         .take(nb_test_samples)
+        .map(|u| u as f32)
         .collect::<Vec<_>>();
 
     let u_norm_test = (0..nb_test_samples)
-        .map(|_| Vector3::from_vec(normal.sample_iter(&mut rng)
+        .map(|_| Vector3::<f32>::from_vec(normal.sample_iter(&mut rng)
             .take(3)
+            .map(|u| u as f32)
             .collect::<Vec<_>>()))
         .collect::<Vec<_>>();
 
     // println!("{:#?}",u_norm_test);
     let x_test = u_test.iter()
-        .map(|&u| u < pi[1])
+        .map(|&u| (u as f32) < pi[1])
         .zip(u_norm_test.iter())
         .map(|(boolean, &u_norm)| means[boolean as usize] + covs_chol[boolean as usize]*u_norm)
         .collect::<Vec<_>>();
 
     // println!("{:#?}",x_test);
     let z_test = u_test.iter()
-        .map(|u| *u <  pi[1])
+        .map(|&u| (u as f32) <  pi[1])
         .map(|boolean|  boolean as usize)
         .collect::<Vec<_>>();
 
@@ -176,9 +180,9 @@ let epsilon = value_t_or_exit!(matches.value_of("epsilon"), f64);
         .iter()
         .zip(z_test.iter())
         .map(|(z_gmm, z_true)| (z_gmm == z_true) as usize )
-        .sum::<usize>() as f64 / nb_test_samples as f64;
+        .sum::<usize>() as f32 / nb_test_samples as f32;
     if test_accuracy < 0.25 {
-        test_accuracy = 1 as f64 - test_accuracy // index of gaussian shifted
+        test_accuracy = 1 as f32 - test_accuracy // index of gaussian shifted
     }
     println!("Testing accuracy: {}", test_accuracy);
     
