@@ -1,5 +1,5 @@
 [package]
-name = "col_seg_3d"
+name = "nalg-test"
 version = "0.1.0"
 authors = ["damien <riouxld21@gmail.com>"]
 edition = "2018"
@@ -8,8 +8,6 @@ edition = "2018"
 
 [dependencies]
 gmm = { path = "../../" }
-image = { version = "*", features = ["jpeg", "png"] }
-clap = "*"
-statrs = "*"
 rand = "*"
+statrs = "*"
 nalgebra = "*"

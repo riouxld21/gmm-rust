@@ -1,9 +1,4 @@
- 
-// use image::{DynamicImage, GenericImage, Pixel};
-
 use nalgebra::{Vector3, Matrix3};
-use nalgebra_mvn::MultivariateNormal;
-
 use rand::distributions::{Distribution};
 use statrs::distribution::{Uniform, Normal, Continuous};
 use rayon::prelude::*;
@@ -106,7 +101,7 @@ impl<'a> EM<f64> for GMM1D<'a> {
             .map(|&x| self.gaussians
                 .iter()
                 .zip(self.pi.iter())
-                .map(|(&gaussian, &p)| p * gaussian.pdf(x))
+                .map(|(gaussian, &p)| p * gaussian.pdf(x))
                 .sum()
             ).collect::<Vec<f64>>();
     }
@@ -125,7 +120,7 @@ impl<'a> EM<f64> for GMM1D<'a> {
             .map(|(&x, cst)| self.gaussians
                 .iter()
                 .zip(self.pi.iter())
-                .map(|(&gaussian, &p)| p * gaussian.pdf(x)/cst)
+                .map(|(gaussian, &p)| p * gaussian.pdf(x)/cst)
                 .collect::<Vec<f64>>()
             ).collect::<Vec<_>>();
     }
@@ -239,7 +234,7 @@ impl<'a> EM<f64> for GMM1D<'a> {
             .map(|&x| self.gaussians
                 .iter()
                 .zip(self.pi.iter())
-                .map(|(&gaussian, &p)| p * gaussian.pdf(x))
+                .map(|(gaussian, &p)| p * gaussian.pdf(x))
                 .sum()
             ).collect::<Vec<f64>>();
             
@@ -249,7 +244,7 @@ impl<'a> EM<f64> for GMM1D<'a> {
             .map(|(&x, cst)| self.gaussians
                 .iter()
                 .zip(self.pi.iter())
-                .map(|(&gaussian, &p)| p * gaussian.pdf(x)/cst)
+                .map(|(gaussian, &p)| p * gaussian.pdf(x)/cst)
                 .collect::<Vec<f64>>()
             ).collect::<Vec<_>>();
 
@@ -267,6 +262,40 @@ impl<'a> EM<f64> for GMM1D<'a> {
     }
 }
 
+#[allow(dead_code)]
+pub struct MVN {
+    dim: usize,
+    mean: Vector3<f64>,
+    cov: Matrix3<f64>,
+    det_sqrt: f64,
+    inv: Matrix3<f64>,
+    cst: f64,
+}
+
+
+pub fn init_mvn( dim: usize, mean: Vector3<f64>, cov: Matrix3<f64>) -> MVN {
+        
+        let chol = cov.clone().cholesky().unwrap();
+        let det_sqrt = chol.l().determinant();
+        let cst = 1./((2.* std::f64::consts::PI).powf(dim as f64 / 2.) * chol.l().determinant());
+
+        return MVN {
+            dim: dim,
+            mean: mean,
+            cov: cov,
+            det_sqrt: det_sqrt,
+            inv: chol.inverse(),
+            cst: cst,
+        }
+    }
+
+impl MVN {
+    pub fn pdf(&self, x: &Vector3<f64>) -> f64 { 
+        return self.cst*(-0.5*(x-self.mean).transpose()*self.inv*(x-self.mean))[0].exp()
+     }
+}
+
+
 
 pub struct GMM3D<'a> {
     nb_samples: usize,
@@ -278,7 +307,7 @@ pub struct GMM3D<'a> {
     pub means: Vec<Vector3<f64>>,
     pub covs: Vec<Matrix3<f64>>,
     pub cov_reg: Matrix3<f64>,
-    // pub mvns: Vec<MultivariateNormal<f64, U3>>,
+    pub mvns: Vec<MVN>,
     pub z: Vec<usize>,
     weights: Vec<f64>,
     gamma_norm: Vec<f64>,
@@ -287,12 +316,12 @@ pub struct GMM3D<'a> {
 }
 
 
-pub fn init_gmm3_d( nb_samples: usize,
+pub fn init_gmm3_d<'a>( nb_samples: usize,
     nb_components: usize,
     cov_reg: f64,
     nb_iter:usize,
     epsilon:f64,
-    samples: &Vec<Vector3<f64>>) -> GMM3D{
+    samples: &'a Vec<Vector3<f64>>) -> GMM3D<'a>{
         return GMM3D {
             nb_samples: nb_samples,
             nb_components: nb_components,
@@ -303,6 +332,7 @@ pub fn init_gmm3_d( nb_samples: usize,
             means: Vec::<Vector3<f64>>::new(),
             covs: Vec::<Matrix3<f64>>::new(),
             cov_reg: Matrix3::from_diagonal_element(cov_reg),
+            mvns: Vec::<MVN>::new(),
             z: Vec::<usize>::new(),
             weights: Vec::<f64>::new(),
             gamma_norm: Vec::<f64>::new(),
@@ -340,6 +370,11 @@ impl<'a> EM<Vector3<f64>> for GMM3D<'a> {
             .map(|_| Matrix3::from_diagonal_element(0.05))
         .collect::<Vec<_>>();
 
+        self.mvns = self.means
+            .iter()
+            .zip(self.covs.iter())
+            .map(|(&mean, &cov)| init_mvn(3, mean.clone(), cov.clone()))
+            .collect::<Vec<_>>();
 
         // println!("pi {:#?}", self.pi);
         // println!("means {:#?}", self.means);
@@ -359,12 +394,9 @@ impl<'a> EM<Vector3<f64>> for GMM3D<'a> {
         
         self.gamma_norm = self.samples
             .par_iter()
-            .map(|&x| self.means.iter()
-                .zip(self.covs.iter())
+            .map(|&x| self.mvns.iter()
                 .zip(self.pi.iter())
-                .map(|((&mean, &cov), &p)|
-                    p * MultivariateNormal::from_mean_and_covariance(&mean, &cov).unwrap().pdf(&(x).transpose())[0]
-                )
+                .map(|(mvn, &p)| p * mvn.pdf(&x))
                 .sum()
             ).collect::<Vec<f64>>();
     }
@@ -381,12 +413,9 @@ impl<'a> EM<Vector3<f64>> for GMM3D<'a> {
         self.gamma = self.samples
             .par_iter()
             .zip(self.gamma_norm.par_iter())
-            .map(|(&x, cst)| self.means.iter()
-                .zip(self.covs.iter())
+            .map(|(&x, cst)| self.mvns.iter()
                 .zip(self.pi.iter())
-                .map(|((&mean, &cov), &p)|
-                    p * MultivariateNormal::from_mean_and_covariance(&mean, &cov).unwrap().pdf(&(x).transpose())[0]/cst
-                )
+                .map(|(mvn, &p)| p * mvn.pdf(&x)/cst)
                 .collect::<Vec<f64>>()
             ).collect::<Vec<Vec<f64>>>();
     }
@@ -445,7 +474,7 @@ impl<'a> EM<Vector3<f64>> for GMM3D<'a> {
             self.covs[j] /= self.weights[j];
             self.covs[j] += self.cov_reg;
 
-        //     // self.gaussians[j] = Normal::new(self.means[j], self.covs[j]).unwrap();
+            self.mvns[j] = init_mvn(3, self.means[j].clone(), self.covs[j].clone());
         }
 
 
@@ -517,11 +546,10 @@ impl<'a> EM<Vector3<f64>> for GMM3D<'a> {
 
         let test_gamma_norm = test_samples
             .par_iter()
-            .map(|&x| self.means.iter()
-                .zip(self.covs.iter())
+            .map(|&x| self.mvns.iter()
                 .zip(self.pi.iter())
-                .map(|((&mean, &cov), &p)|
-                    p * MultivariateNormal::from_mean_and_covariance(&mean, &cov).unwrap().pdf(&(x).transpose())[0]
+                .map(|(mvn, &p)|
+                    p * mvn.pdf(&x)
                 )
                 .sum()
             ).collect::<Vec<f64>>();
@@ -529,12 +557,9 @@ impl<'a> EM<Vector3<f64>> for GMM3D<'a> {
         let test_gamma = test_samples
             .par_iter()
             .zip(test_gamma_norm.par_iter())
-            .map(|(&x, cst)| self.means.iter()
-                .zip(self.covs.iter())
+            .map(|(&x, cst)| self.mvns.iter()
                 .zip(self.pi.iter())
-                .map(|((&mean, &cov), &p)|
-                    p * MultivariateNormal::from_mean_and_covariance(&mean, &cov).unwrap().pdf(&(x).transpose())[0]/cst
-                )
+                .map(|(mvn, &p)| p * mvn.pdf(&x)/cst)
                 .collect::<Vec<f64>>()
             ).collect::<Vec<Vec<f64>>>();
 
