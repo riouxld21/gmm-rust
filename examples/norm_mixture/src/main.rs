@@ -33,7 +33,7 @@ fn main() {
                 .help("Number of Gaussian component")
                 .short("k")
                 .takes_value(true)
-                .default_value("10"),
+                .default_value("2"),
         )
         .arg(
             Arg::with_name("reg_cov")
@@ -81,9 +81,9 @@ fn main() {
     let covs = vec![0.1 as f64, 0.3 as f64];
 
     let gaussians = means.iter()
-    .zip(covs.iter())
-    .map(|(mean, cov)| Normal::new(*mean, *cov).unwrap())
-    .collect::<Vec<_>>();
+        .zip(covs.iter())
+        .map(|(mean, cov)| Normal::new(*mean, *cov).unwrap())
+        .collect::<Vec<_>>();
 
     let u_train = uniform
         .sample_iter(&mut rng)

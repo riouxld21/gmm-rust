@@ -1,5 +1,5 @@
 [package]
-name = "gmm"
+name = "col_seg_3d"
 version = "0.1.0"
 authors = ["damien <riouxld21@gmail.com>"]
 edition = "2018"
@@ -7,9 +7,10 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+gmm = { path = "../../" }
+image = { version = "*", features = ["jpeg", "png"] }
+clap = "*"
+statrs = "*"
+rand = "*"
 nalgebra-mvn = "0.3.0"
 nalgebra = "0.20.0"
-# image = { version = "*", features = ["jpeg", "png"] }
-rand = "*"
-rayon = "*"
-statrs = "*"
